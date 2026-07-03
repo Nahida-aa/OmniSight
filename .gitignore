@@ -9,6 +9,7 @@ apks/
 *.apk
 *.dex
 *.so
+*.log
 
 # IDE
 .vscode/

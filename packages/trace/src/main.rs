@@ -74,23 +74,30 @@ fn main() -> Result<()> {
     }
     let keywords_only = cli.keywords_only && !patterns.is_empty();
 
-    // Signal handler: Enter to stop
+    // Always save all raw logs to ../logs/ with timestamp
+    let logs_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../logs");
+    std::fs::create_dir_all(&logs_dir)?;
+    let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+    let log_path = logs_dir.join(format!("dfm_{}.log", timestamp));
+    let mut log_file = std::fs::File::create(&log_path)?;
+    use std::io::Write;
+
+    // Signal handler: Ctrl+C to stop
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();
-    std::thread::spawn(move || {
-        let mut _input = String::new();
-        let _ = std::io::stdin().read_line(&mut _input);
+    ctrlc::set_handler(move || {
+        println!("\n   ⏹️  Stopping...");
         r.store(false, Ordering::Relaxed);
-    });
+    })?;
 
     // PID resolution with auto-retry
-    let pid = loop {
+    let mut pid = loop {
         if !running.load(Ordering::Relaxed) {
             println!("   Cancelled by user.");
             return Ok(());
         }
         match adb::resolve_pid(cli.serial.as_deref(), &cli.package) {
-            Ok(pid) => break pid,
+            Ok(p) => break p,
             Err(e) => {
                 let msg = e.to_string();
                 if msg.contains("ADB error") {
@@ -104,9 +111,10 @@ fn main() -> Result<()> {
         }
     };
     println!("\n   ✓ PID = {}", pid);
+    println!("   Saving raw logs to: {}", log_path.display());
 
     // Polling loop
-    println!("\n📡 Polling logcat (PID {}, every 2s)... Press Enter to stop.\n", pid);
+    println!("\n📡 Polling logcat (PID {}, every 2s)... Press Ctrl+C to stop.\n", pid);
     let start = Instant::now();
     let mut seen_lines = std::collections::HashSet::new();
     let mut total_lines = 0usize;
@@ -116,6 +124,23 @@ fn main() -> Result<()> {
     let max_matched = 1000;
 
     while running.load(Ordering::Relaxed) {
+        // Re-check PID every 10 iterations (~20s) in case the app restarted
+        {
+            use std::sync::atomic::AtomicU32;
+            static ITER: AtomicU32 = AtomicU32::new(0);
+            let iter = ITER.fetch_add(1, Ordering::Relaxed);
+            if iter % 10 == 0 {
+                if let Ok(new_pid) = adb::resolve_pid(cli.serial.as_deref(), &cli.package) {
+                    if new_pid != pid {
+                        println!("\n   🔄 PID changed: {} → {}, restarting capture", pid, new_pid);
+                        let _ = log_file.flush();
+                        seen_lines.clear();
+                        pid = new_pid;
+                    }
+                }
+            }
+        }
+
         let lines = match adb::dump_logcat(cli.serial.as_deref(), pid) {
             Ok(l) => l,
             Err(e) => {
@@ -139,6 +164,10 @@ fn main() -> Result<()> {
                 continue;
             }
 
+            // Write to log file with elapsed time prefix
+            let elapsed = start.elapsed().as_secs_f32();
+            let _ = writeln!(log_file, "[{:.1}s] {}", elapsed, line);
+
             if let Some(entry) = logcat::parse_logcat_line(line) {
                 let matched = patterns.match_line(&entry.message);
                 let is_match = !matched.is_empty();
@@ -160,14 +189,14 @@ fn main() -> Result<()> {
                     }
                     println!(
                         "  \x1b[33m[{:.1}s]\x1b[0m \x1b[36m{}\x1b[0m: {}",
-                        start.elapsed().as_secs_f32(),
+                        elapsed,
                         entry.tag,
                         entry.message
                     );
                 } else {
                     println!(
                         "  [{:.1}s] {}/{}: {}",
-                        start.elapsed().as_secs_f32(),
+                        elapsed,
                         entry.tag,
                         entry.priority,
                         entry.message

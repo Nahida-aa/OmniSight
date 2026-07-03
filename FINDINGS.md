@@ -106,23 +106,45 @@ ACE 相关库:
 
 ## 运行时 SDK 行为
 
+> 基于一次完整对局日志（3051 行 / 332 秒 / 531KB）分析
+> 入地图时间点：~20s（大厅 → 匹配成功）
+> PID: 19002
+
+### 完整时间线
+
+| 时间 | 阶段 | 事件 |
+|---|---|---|
+| **0–20s** | 大厅 | ACE /proc 扫描启动，GPMSDK 加载，FPS 55，GCloud DNS 批量查询大厅服务器 |
+| **~20s** | **入地图** | trace 首次匹配，新建大量网络连接 |
+| **~33s** | 战斗中 | GCloud DNS 批量解析南京机房 ds-prod-nj-* 全系列域名 |
+| **~63s** | 战斗中 | 连接 `ds-prod-nj-12.df.qq.com` (58.217.180.240)，GCloud Puffer 初始化 |
+| **~90s** | 战斗中 | GPMSDK 场景标记失败 (`EndTag ERROR`) |
+| **~231s** | 战斗中 | DNS 缓存过期，重新解析 |
+| **~312s** | 战斗中 | GPMSDK PerfSight 数据上报 |
+| **~327s** | 战斗中 | GCloud Puffer 下载配置更新 |
+| **332s** | 结束 | 用户按 Ctrl+C 停止 |
+
 ### GPMSDK — 腾讯性能监控
 
 | 观察 | 说明 |
 |---|---|
-| `FPS: 45` | 当前帧率，小米 DynamicFPS |
-| `Qcc judge value cached: level6 4` | 画质等级 6 |
-| `PerfSight` 数据上报 | 性能数据打包为 `hawk_data.pre_*_*.zip` |
-| `GemModule` 远程控制 | 远程配置下发 |
+| `FPS: 45–55` | 当前帧率，小米 DynamicFPS |
+| `Qcc judge value cached: level6 4` | 画质等级 6（最高档） |
+| `PerfSight` 数据上报 | 性能数据打包为 `hawk_data.pre_*.zip`，上报到腾讯 |
+| `GemModule` 远程控制 | 远程配置下发，错误码 0 |
 | 设备: `Qualcomm Adreno 810 Vulkan 1.3.284` | GPU 信息 |
+| `endExtTag/beginExtTag ERROR` | 场景标记频繁出错（无当前场景） |
+| `AddTag ERROR` | 场景打标失败 |
 
 ### GCloud / Puffer — 资源分发
 
 | 观察 | 说明 |
 |---|---|
-| DNS mode type 1 | 使用 HTTPDNS |
-| Puffer 下载路径 | `/data/user/0/.../Puffer/` 目录 |
-| 服务器 | `ds-prod-nj-11.df.qq.com`（新增，南京机房） |
+| DNS mode type 1 | 使用 HTTPDNS（腾讯 GCloud） |
+| Puffer 下载路径 | `/data/user/0/.../Puffer/` 目录，增量更新 |
+| 双栈解析 | HttpDns v4 + v6 同时发起 |
+| 缓存周期 | TTL 225 秒 |
+| `MakeSureGetUrlFromConfig error` | 配置获取失败 |
 | 失败重试 | `hdns_retry_ctl: 3`, `hdns_4a_retry_ctl: 1` |
 
 ### GVoice — 腾讯语音
@@ -131,6 +153,19 @@ ACE 相关库:
 |---|---|
 | 多音频通道 (term 2/3) | 输入/输出音频流 |
 | 多次插件初始化 | `PLUGIN::init / gvoice` |
+| 音频格式 | 48000Hz, 2ch, PCM |
+
+### ACE /proc 扫描规律
+
+| 观察 | 说明 |
+|---|---|
+| **扫描间隔** | 约 **30 秒一轮**，贯穿整个对局 |
+| **SELinux** | 全部 `avc: denied`，MIUI 阻止了 ACE 的 /proc 读取 |
+| **扫描范围** | 30+ 个 /proc 条目（详见下方） |
+
+**ACE 扫描的 /proc 条目完整列表**：
+
+`/proc/mv, /proc/fas, /proc/mtd, /proc/sla, /proc/keys, /proc/kmsg, /proc/misc, /proc/stat, /proc/iomem, /proc/locks, /proc/swaps, /proc/crypto, /proc/fts_ta, /proc/uptime, /proc/vmstat, /proc/cgroups, /proc/cmdline, /proc/devices, /proc/ioports, /proc/loadavg, /proc/mimdlog, /proc/modules, /proc/version, /proc/consoles, /proc/kallsyms, /proc/slabinfo, /proc/softirqs, /proc/zoneinfo, /proc/buddyinfo, /proc/config.gz, /proc/sysrq-trigger, /proc/tp_fw_version, /proc/global_reclaim, /proc/kdamond_cpuset, /proc/tp_selftest_v0, /proc/tp_data_dump_v0, /proc/apss_sleep_stats, /proc/clk_enabled_list, /proc/perflock_records, /proc/tp_fw_version_v0, /proc/tp_lockdown_info, /proc/last_touch_events, /proc/modem_sleep_stats, /proc/show_metis_schlat, /proc/modem_t1_gpio_ctrl, /proc/perflock_exception, /proc/tp_lockdown_info_v0, /proc/show_mi_runtime_info, /proc/regulator_enabled_list, /proc/show_mi_art_mutex_info, /proc/enable_msflag, /proc/kcompactd_pid, /data/adb`
 
 ---
 
@@ -166,14 +201,26 @@ ACE 相关库:
 |---|---|---|
 | URL | 42 | 含游戏相关端点 |
 | IP:Port | 10 | 硬编码 IP |
-| 域名 | 4,657 | 经过 protobuf 去重 |
+| 域名 | 4,657 | 经过 protobuf 去重（静态扫描） |
 
-**运行时确认的服务器域名**:
-- `dscs-prod-nj-*.df.qq.com` — 南京机房 (3/4/5/11)
-- `ds-prod-nj-11.df.qq.com` — 新增地址
-- `cloud.tgpa.qq.com` — 腾讯 GPA 云端
-- `tauth.qq.com` — QQ 登录
-- `api.unipay.qq.com` — 腾讯支付
+**运行时确认的服务器域名（完整列表）**:
+
+| 域名 | IP | 说明 |
+|---|---|---|
+| `ds-prod-nj-12.df.qq.com` | `58.217.180.240` | 南京游戏服 |
+| `ds-prod-nj-12-bak.df.qq.com` | `58.217.182.91` | 南京游戏服备用 |
+| `ds-prod-nj-12-bgp.df.qq.com` | `1.13.155.158` | 南京 BGP |
+| `xycs-prod-nj.df.qq.com` | `222.94.109.121` | 南京（未知服务） |
+| `lobby-prod-b.df.qq.com` | — | 大厅服务器 |
+| `dscs-prod-cq*.df.qq.com` | — | 重庆机房 |
+| `dscs-prod-gz*.df.qq.com` | — | 广州机房 |
+| `dscs-prod-tj*.df.qq.com` | `123.151.57.171` | 天津机房 |
+| `cloud.tgpa.qq.com` | — | 腾讯 GPA 云端 |
+| `tauth.qq.com` | — | QQ 登录 |
+| `api.unipay.qq.com` | — | 腾讯支付 |
+
+**协议特征**: DNS 解析使用腾讯 GCloud HTTPDNS，双栈 v4+v6，
+`ds-` 前缀为游戏数据服务器，`dscs-` 为 discovery 服务
 
 **扫描检测到的网络协议**:
 - TCP / UDP / WebSocket
