@@ -59,11 +59,11 @@
 - [ ] GObjects 数组模式识别
 - [ ] UObject / UFunction 虚表定位
 
-## Phase 2: 日志分析 (trace)
-- [ ] logcat 收集器（adb logcat 解析）
-- [ ] 应用文件日志拉取
-- [ ] 关键词匹配 + 异常频率检测
-- [ ] 日志与静态分析结果关联
+## Phase 2: 日志分析 (trace) — 已实现
+- [x] logcat 采集器（adb logcat 解析，支持 PID 过滤）
+- [x] 关键字匹配（支持加载 report.json + CLI 额外关键字）
+- [x] 匹配统计输出 + JSON 报告保存
+- [ ] 日志与静态分析结果关联（report.json 模式加载已完成，待实机验证）
 
 ## Phase 3: 网络分析 (packet)
 - [ ] mitmproxy 环境搭建
