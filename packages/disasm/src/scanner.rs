@@ -65,10 +65,15 @@ fn scan_ips(haystack: &str) -> Vec<ScannedString> {
 fn scan_domains(haystack: &str) -> Vec<ScannedString> {
     let re = Regex::new(r"\b([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}\b").unwrap();
     let mut results = Vec::new();
+    // Filter out protobuf type refs: PascalCase labels aren't domains
+    let proto_ref = Regex::new(r"\b[A-Z][a-zA-Z0-9]*\.[A-Z]").unwrap();
     for cap in re.captures_iter(haystack) {
         let domain = cap[0].to_string();
         // Filter out non-domain matches
-        if domain.len() > 4 && !domain.contains("_") {
+        if domain.len() > 4
+            && !domain.contains("_")
+            && !proto_ref.is_match(&domain)
+        {
             results.push(ScannedString {
                 value: domain,
                 context: None,
@@ -120,8 +125,7 @@ fn scan_crypto_keys(haystack: &str) -> Vec<ScannedString> {
 fn scan_proto_descriptors(haystack: &str) -> Vec<ScannedString> {
     let mut results = Vec::new();
 
-    // Protobuf field descriptors contain patterns like `\n\x02\x08\x01`
-    // Also look for literal "message " and "package " patterns
+    // Protobuf source syntax: message/enum/service declarations
     let re = Regex::new(r#"(?m)^\s*(message|enum|service|package)\s+([A-Za-z_][A-Za-z0-9_]*)"#).unwrap();
     for cap in re.captures_iter(haystack) {
         results.push(ScannedString {
@@ -130,6 +134,21 @@ fn scan_proto_descriptors(haystack: &str) -> Vec<ScannedString> {
             location: "all".to_string(),
             category: "protobuf".to_string(),
         });
+    }
+
+    // Compiled protobuf type references: PascalCase.TypeName (e.g. SightPkg.RequestPkg)
+    let compiled = Regex::new(r"\b([A-Z][a-zA-Z0-9]{2,}\.[A-Z][a-zA-Z0-9]{2,}(?:\.[A-Z][a-zA-Z0-9]{2,})*)\b").unwrap();
+    for cap in compiled.captures_iter(haystack) {
+        let val = cap[1].to_string();
+        // Skip if it ends with .proto (that's just a filename reference, handled above)
+        if !val.ends_with(".proto") && !results.iter().any(|r| r.value == val) {
+            results.push(ScannedString {
+                value: val,
+                context: None,
+                location: "all".to_string(),
+                category: "protobuf".to_string(),
+            });
+        }
     }
 
     results

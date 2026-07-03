@@ -82,14 +82,27 @@ pub fn analyze_elf(elf_files: &[(String, Vec<u8>)]) -> Result<Vec<ElfModuleInfo>
 fn detect_engine(name: &str, exported: &[String], imported: &[String], data: &[u8]) -> EngineType {
     let name_lower = name.to_lowercase();
 
-    if name_lower.contains("ue4") || name_lower.contains("libue4") {
-        return EngineType::UnrealEngine4;
-    }
+    // UE5 check first (UE5 mobile still ships libUE4.so; check binary for UE5 sigs)
     if name_lower.contains("ue5") || name_lower.contains("libue5") {
         return EngineType::UnrealEngine5;
     }
     if name_lower.contains("unity") || name_lower.contains("libunity") {
         return EngineType::Unity;
+    }
+
+    // libUE4.so could be UE4 or UE5 on mobile; check imported symbols for UE5 patterns
+    if name_lower.contains("ue4") || name_lower.contains("libue4") {
+        let raw = String::from_utf8_lossy(data);
+        if raw.contains("UE5") || raw.contains("UnrealEngine5") || raw.contains("UE5-") {
+            return EngineType::UnrealEngine5;
+        }
+        // Check symbols for UE5-specific patterns
+        for sym in exported.iter().chain(imported) {
+            if sym.contains("UE5") || sym.contains("UnrealEngine5") {
+                return EngineType::UnrealEngine5;
+            }
+        }
+        return EngineType::UnrealEngine4;
     }
 
     for sym in exported.iter().chain(imported) {

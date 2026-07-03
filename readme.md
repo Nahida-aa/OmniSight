@@ -9,3 +9,14 @@ packet
 heap
 
 Insufficient Balance
+
+## 依赖
+
+### adb
+
+```sh
+# arch linux
+
+# windows
+winget install Google.PlatformTools
+```
