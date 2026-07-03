@@ -26,7 +26,7 @@ struct Cli {
     report: Option<PathBuf>,
 
     /// Output directory
-    #[arg(short, long, default_value = "trace_output")]
+    #[arg(short, long, default_value = "logs")]
     output: PathBuf,
 
     /// Only show lines matching known patterns

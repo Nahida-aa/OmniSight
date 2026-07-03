@@ -6,10 +6,16 @@ node_modules/
 
 # APK & generated analysis output
 apks/
+logs/
+output/
+capture/
 *.apk
 *.dex
 *.so
 *.log
+*.pcap*
+*.etl
+*.cab
 
 # IDE
 .vscode/

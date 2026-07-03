@@ -75,11 +75,13 @@
 - [x] 代码重构（拆分为 adb/logcat/matcher/types 模块）
 - [ ] 根据运行时日志提炼有效关键字，优化匹配规则
 
-## Phase 3: 网络分析 (packet)
-- [ ] mitmproxy 环境搭建
-- [ ] 测试 WiFi 代理直连（不修改 APK）
-- [ ] 如有必要：修改 Network Security Config 重打包
-- [ ] 流量录制 + 协议解析框架
+## Phase 3: 网络分析 (packet) — 已实现
+- [x] 抓包工具 `omnisight-packet`（基于 tshark，支持 BPF 过滤）
+- [x] 自动加载静态分析结果中的已知服务器 IP
+- [x] 一键列出网卡 + 自动选择热点网卡
+- [x] 抓包后自动输出统计（端点、协议分层、包计数）
+- [ ] 手机热点 + Wireshark 实机验证
+- [ ] 协议解析与静态/动态分析结果关联
 
 ## (推迟) Phase 4: 内存分析
 - [ ] 根据前面成果评估可行性

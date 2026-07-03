@@ -11,3 +11,6 @@ path = "src/main.rs"
 omnisight-shared = { path = "../shared" }
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
+chrono = "0.4"
+ctrlc = "3.4"
+serde_json = "1"

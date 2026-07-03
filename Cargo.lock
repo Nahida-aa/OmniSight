@@ -826,8 +826,11 @@ name = "omnisight-packet"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
+ "ctrlc",
  "omnisight-shared",
+ "serde_json",
 ]
 
 [[package]]
