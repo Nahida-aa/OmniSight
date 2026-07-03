@@ -1,7 +1,7 @@
 # OmniSight 分析发现 — 三角洲行动 (Delta Force)
 
-> 基于静态分析 (`omnisight-disasm`) 结果整理
-> 更新时间: 2026-07-03
+> 基于静态分析 (`omnisight-disasm`) + 运行时日志 (`omnisight-trace`) 结果整理
+> 更新时间: 2026-07-04
 
 ---
 
@@ -64,9 +64,11 @@
 
 ---
 
-## ACE 反作弊 (Anti-Cheat Expert)
+## ACE 反作弊 (Anti-Cheat Expert) — 运行时验证
 
-确认使用腾讯 ACE 反作弊，证据：
+确认使用 ACE + SELinux 对抗。**运行时日志验证了 ACE 的 /proc 扫描行为**。
+
+### 静态证据
 
 | 证据 | 来源 |
 |---|---|
@@ -76,6 +78,21 @@
 | 数据文件 `a64.datPK` / `a64.sigPK` | `libtprt.so` 引用 |
 | `libtersafe.so` 引用 | `libtprt.so` 中 `libtersafe.so` 字符串 |
 
+### 运行时证据 (logcat)
+
+ACE 通过 `Thread-183`/`Thread-391`/`Thread-392` 持续扫描 `/proc`，被 MIUI SELinux **denied**：
+
+| 扫描目标 | 路径 | 用途 |
+|---|---|---|
+| 系统状态 | `/proc/stat, uptime, loadavg, version, cmdnline, devices` | 环境检测 |
+| 内核 | `/proc/kallsyms, modules, config.gz, keys, kmsg, crypto` | Root 检测 |
+| 内存 | `/proc/zoneinfo, buddyinfo, slabinfo, swaps, vmstat, iomem` | 内存特征 |
+| 网络 | `/proc/net/dev` | 连接检测 |
+| 硬件 | `/proc/asound, ft\_ta, hyperframe, mi\_mem\_engine, ioports` | 设备特征 |
+| 安全 | `/data/adb` | ADB 残留检测 |
+
+关键点：**SELinux `avc: denied` 全部拦下**，ACE 的 /proc 读取在当前 MIUI 版本上被系统阻止。
+
 ACE 相关库:
 
 | 库 | 字符串数 | 说明 |
@@ -84,6 +101,36 @@ ACE 相关库:
 | `libtprt.so` | 304 | ACE 运行时（引用 tersafe + 数据文件） |
 
 详情: `apks/report/ace_analysis.md`
+
+---
+
+## 运行时 SDK 行为
+
+### GPMSDK — 腾讯性能监控
+
+| 观察 | 说明 |
+|---|---|
+| `FPS: 45` | 当前帧率，小米 DynamicFPS |
+| `Qcc judge value cached: level6 4` | 画质等级 6 |
+| `PerfSight` 数据上报 | 性能数据打包为 `hawk_data.pre_*_*.zip` |
+| `GemModule` 远程控制 | 远程配置下发 |
+| 设备: `Qualcomm Adreno 810 Vulkan 1.3.284` | GPU 信息 |
+
+### GCloud / Puffer — 资源分发
+
+| 观察 | 说明 |
+|---|---|
+| DNS mode type 1 | 使用 HTTPDNS |
+| Puffer 下载路径 | `/data/user/0/.../Puffer/` 目录 |
+| 服务器 | `ds-prod-nj-11.df.qq.com`（新增，南京机房） |
+| 失败重试 | `hdns_retry_ctl: 3`, `hdns_4a_retry_ctl: 1` |
+
+### GVoice — 腾讯语音
+
+| 观察 | 说明 |
+|---|---|
+| 多音频通道 (term 2/3) | 输入/输出音频流 |
+| 多次插件初始化 | `PLUGIN::init / gvoice` |
 
 ---
 
@@ -121,13 +168,12 @@ ACE 相关库:
 | IP:Port | 10 | 硬编码 IP |
 | 域名 | 4,657 | 经过 protobuf 去重 |
 
-**腾讯系域名 (352 个)** 示例:
+**运行时确认的服务器域名**:
+- `dscs-prod-nj-*.df.qq.com` — 南京机房 (3/4/5/11)
+- `ds-prod-nj-11.df.qq.com` — 新增地址
 - `cloud.tgpa.qq.com` — 腾讯 GPA 云端
 - `tauth.qq.com` — QQ 登录
 - `api.unipay.qq.com` — 腾讯支付
-- `analy.qq.com` — 腾讯分析
-- `appsupport.qq.com` — 应用支持
-- `imgcache.qq.com` — 图片 CDN
 
 **扫描检测到的网络协议**:
 - TCP / UDP / WebSocket
@@ -154,6 +200,7 @@ ACE 相关库:
 ## 后续建议
 
 1. **抓包分析**: 运行游戏 + mitmproxy / PCAP 捕获，确定实际协议格式
-2. **DEX 反混淆**: jadx 反编译 DEX，在网络相关类中定位协议处理逻辑
-3. **ACE 绕过评估**: 评估 frida / 注入工具在 ACE 防护下的可用性
-4. **UE5 内存分析**: 运行时读取 GName / GObjects 获取类型信息
+2. **ACE /proc 监控**: 持续观察 ACE 的 /proc 扫描行为，确认是否有未被 SELinux 拦截的检测
+3. **DEX 反混淆**: jadx 反编译 DEX，在网络相关类中定位协议处理逻辑
+4. **ACE 绕过评估**: 评估 frida / 注入工具在 ACE + SELinux 防护下的可用性
+5. **UE5 内存分析**: 运行时读取 GName / GObjects 获取类型信息

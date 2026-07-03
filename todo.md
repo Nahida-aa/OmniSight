@@ -17,7 +17,7 @@
 - [x] 枚举所有 .so，识别主引擎（libUE4.so → UE5）
 - [x] 符号表提取：导出函数、导入函数、动态符号
 - [x] 字符串表提取：rodata / strtab 段可打印字符串
-- [ ] 反调试/加固识别（部分实现，ACE 关键词已提取，需系统化）
+- [x] 反调试/加固识别（ACE /proc 扫描行为已在运行时验证，SELinux denied）
 
 ### 信息提取
 - [x] 网络端点扫描：URL、IP、域名
@@ -36,21 +36,27 @@
 
 ## 对三角洲行动的深入分析
 
+### 运行时日志分析（已完成）
+- [x] 实现 logcat 采集器（`omnisight-trace`，支持 PID 过滤 + 去重 + 自动重试）
+- [x] ACE 运行时行为：/proc 扫描被 MIUI SELinux 拦截
+- [x] GPMSDK 性能监控：FPS 45, PerfSight 数据上报, 画质等级 6
+- [x] GCloud Puffer 资源分发：DNS mode, P2P 更新
+- [x] GVoice 语音 SDK 初始化
+- [ ] 提炼游戏运行时关键字，优化 trace 模式匹配
+
 ### SightPkg 协议还原
 - [x] 提取 466 个 protobuf 类型名，按命名空间分组（`scripts/analyze_proto.ts` → `apks/proto/*.proto`）
 - [x] 分类 SDK 协议 vs 游戏协议：187 命名空间全为 SDK 协议，游戏协议非 protobuf
 - [ ] 需要抓包或 DEX 反向确定游戏实际协议格式
-- [ ] 根据字符串上下文推断字段编号
-- [ ] 生成 .proto 文件框架
 
 ### 网络端点挖掘
 - [x] 从扫描结果筛出真实服务端地址（`scripts/analyze_network.ts` → `apks/report/network_endpoints.md`）
-- [ ] 区分腾讯云 / CDN / 游戏服
+- [x] 运行时确认域名：`dscs-prod-nj-*.df.qq.com` 南京机房
 - [ ] 推测协议类型（TCP/WebSocket/KCP）
 
 ### ACE 反作弊对抗
 - [x] 系统整理 libtersafe.so 检测点（`scripts/analyze_ace.ts` → `apks/report/ace_analysis.md`）
-- [ ] 分类：进程检测 / 内存检测 / 网络检测 / 文件检测（半自动，需人工精筛）
+- [x] 运行时验证：ACE 持续扫描 /proc，被 SELinux 拦截
 - [ ] 分类：进程检测 / 内存检测 / 网络检测 / 文件检测
 - [ ] 整理已知绕过方案
 
@@ -59,11 +65,15 @@
 - [ ] GObjects 数组模式识别
 - [ ] UObject / UFunction 虚表定位
 
-## Phase 2: 日志分析 (trace) — 已实现
+## Phase 2: 日志分析 (trace) — 已实现并验证
 - [x] logcat 采集器（adb logcat 解析，支持 PID 过滤）
 - [x] 关键字匹配（支持加载 report.json + CLI 额外关键字）
 - [x] 匹配统计输出 + JSON 报告保存
-- [ ] 日志与静态分析结果关联（report.json 模式加载已完成，待实机验证）
+- [x] 自动重试 PID 解析（等待游戏启动）
+- [x] 日志去重（修复环形缓冲区重复问题）
+- [x] ADB 错误检测（处理 device offline 等异常）
+- [x] 代码重构（拆分为 adb/logcat/matcher/types 模块）
+- [ ] 根据运行时日志提炼有效关键字，优化匹配规则
 
 ## Phase 3: 网络分析 (packet)
 - [ ] mitmproxy 环境搭建
@@ -77,4 +87,3 @@
 ## 通用
 - [ ] README.md 使用文档
 - [x] 分析报告生成脚本（`scripts/gen_report_md.ts`）
-
