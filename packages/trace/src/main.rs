@@ -39,6 +39,12 @@ struct Cli {
 }
 
 fn main() -> Result<()> {
+    #[cfg(windows)]
+    {
+        use std::process::Command;
+        let _ = Command::new("cmd").args(["/c", "chcp", "65001"]).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).output();
+    }
+
     let cli = Cli::parse();
 
     println!("🔍 OmniSight trace — log analyzer");

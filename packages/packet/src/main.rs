@@ -38,6 +38,13 @@ struct Cli {
 }
 
 fn main() -> Result<()> {
+    // Set console to UTF-8 on Windows
+    #[cfg(windows)]
+    {
+        use std::process::Command;
+        let _ = Command::new("cmd").args(["/c", "chcp", "65001"]).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).output();
+    }
+
     let cli = Cli::parse();
 
     let dumpcap = capture::find_dumpcap()?;
@@ -61,11 +68,8 @@ fn main() -> Result<()> {
 
     let filter = if let Some(ref f) = cli.filter {
         Some(f.clone())
-    } else if !known_ips.is_empty() {
-        let ips_part = known_ips.iter().map(|ip| format!("host {}", ip)).collect::<Vec<_>>().join(" or ");
-        Some(format!("({}) or port 53 or port 443", ips_part))
     } else {
-        None
+        None  // Capture everything; tshark will filter in analysis
     };
 
     if let Some(parent) = cli.output.parent() {
@@ -78,8 +82,12 @@ fn main() -> Result<()> {
         capture::guess_interface(&dumpcap)?
     };
 
+    // Show interface info
+    let alias = capture::find_hotspot_alias().unwrap_or_else(|| interface.clone());
+    println!("   Interface: {alias} (192.168.137.1 — 移动热点)");
+
     let mut child = capture::spawn(&dumpcap, &interface, &cli.output, filter.as_deref())?;
-    println!("📡 Capturing on '{interface}'... Press Ctrl+C to stop.\n");
+    println!("📡 Capturing... Press Ctrl+C to stop.\n");
     println!("   Output: {}", cli.output.display());
 
     let running = Arc::new(AtomicBool::new(true));
