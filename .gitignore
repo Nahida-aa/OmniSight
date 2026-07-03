@@ -9,6 +9,7 @@ apks/
 logs/
 output/
 capture/
+tmp/
 *.apk
 *.dex
 *.so
