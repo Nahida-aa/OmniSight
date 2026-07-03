@@ -1,0 +1,21 @@
+# Rust
+target/
+Cargo.lock
+
+# Node/Bun
+node_modules/
+
+# Output
+*.apk
+*.dex
+*.so
+output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
