@@ -1,15 +1,14 @@
 # Rust
 target/
-Cargo.lock
 
 # Node/Bun
 node_modules/
 
-# Output
+# APK & generated analysis output
+apks/
 *.apk
 *.dex
 *.so
-output/
 
 # IDE
 .vscode/
