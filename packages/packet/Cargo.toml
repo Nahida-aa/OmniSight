@@ -1,0 +1,13 @@
+[package]
+name = "omnisight-packet"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "packet"
+path = "src/main.rs"
+
+[dependencies]
+omnisight-shared = { path = "../shared" }
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }

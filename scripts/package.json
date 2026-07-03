@@ -1,0 +1,14 @@
+{
+  "name": "omnisight-scripts",
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": {
+    "commander": "^12"
+  },
+  "devDependencies": {
+    "@types/node": "^26",
+    "typescript": "^6",
+    "@types/bun": "latest",
+    "@typescript/native-preview": "latest"
+  }
+}

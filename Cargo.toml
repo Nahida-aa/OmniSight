@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "packages/shared",
+    "packages/disasm",
+    "packages/trace",
+    "packages/packet",
+]
+resolver = "2"
